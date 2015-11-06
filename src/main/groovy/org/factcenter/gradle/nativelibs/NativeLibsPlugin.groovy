@@ -55,11 +55,16 @@ class NativeLibsPlugin implements Plugin<Project> {
         }
 
 
-        ['test', 'run'].each { taskName ->
-            if (project.tasks.hasProperty(taskName)) {
-                def task = project.tasks.getByName(taskName)
-                task.configure(addLibPath)
-                task.dependsOn(unpackTask)
+        project.afterEvaluate {
+            // Support java and application plugins by adding library path
+            // and dependencies to "run" and "test" tasks.
+            // We do this in afterEvaluate to make sure all plugins are applied
+            ['test', 'run'].each { taskName ->
+                if (project.tasks.hasProperty(taskName)) {
+                    def task = project.tasks.getByName(taskName)
+                    task.configure(addLibPath)
+                    task.dependsOn(unpackTask)
+                }
             }
         }
         
