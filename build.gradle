@@ -1,0 +1,44 @@
+/**
+ * Support for native libraries in (non-android) Java builds.
+ * 
+ */
+
+plugins {
+    id 'com.gradle.plugin-publish' version '0.9.0'
+}
+
+
+apply plugin: 'java-gradle-plugin'
+
+version = '0.9.0'
+group = 'org.factcenter'
+
+
+
+apply plugin:'groovy'
+
+
+dependencies {
+    compile gradleApi()
+    compile localGroovy()
+}
+
+repositories {
+    jcenter()
+}
+
+
+pluginBundle {
+    website = 'http://factcenter.github.io/gradle-nativelibs/'
+    vcsUrl = 'http://factcenter.github.io/gradle-nativelibs/'
+    description = 'Gradle plugin to aid in managing native libraries associated with Java-based projects.'
+    tags = ['gradle', 'groovy', 'native']
+
+    plugins {
+        nativelibsPlugin {
+            id = 'org.factcenter.nativelibs'
+            displayName = 'Gradle-NativeLibs Plugin'
+        }
+    }
+}
+
