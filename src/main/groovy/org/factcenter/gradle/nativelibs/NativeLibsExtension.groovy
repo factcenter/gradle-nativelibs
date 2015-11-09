@@ -2,8 +2,12 @@ package org.factcenter.gradle.nativelibs
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class NativeLibsExtension {
+    Logger logger = LoggerFactory.getLogger('gradle-nativelibs')
+
     /**
      * Reference to the project we're in
      */
@@ -38,9 +42,8 @@ class NativeLibsExtension {
      * Native platforms to copy/unpack into lib directory
      * Default is currentPlatform, but
      * can add additional platforms if cross-compiling
-     * This is a map, with platforms as keys
      */
-    def supportedPlatforms = [:]
+    def supportedPlatforms = []
 
     /**
      * extensions for native libraries and bundles
@@ -50,14 +53,14 @@ class NativeLibsExtension {
     /**
      *  directory into which native libs are unpacked
      * Native libs will be unpacked into libsDir/platform/*
-     * unless nativeLibsPlatformDir is set
+     * unless platformLibsDir is set
      */
     def libsDir
 
     /**
      * Override per-platform library dir
-     * If the key <i>platform</i> is set then its value is used
-     * as the target directory for that platform.
+     * If the key <i>k</i> is set then its value is used
+     * as the target directory for platform k.
      */
     def platformLibsDir = [:]
 
@@ -65,7 +68,7 @@ class NativeLibsExtension {
         currentOS = System.properties['os.name'].toLowerCase()
         switch (currentOS) {
             case ~/.*os x.*/:
-                currentOS = "osx"
+                currentOS = "macos"
                 currentLibSuffix = "dylib"
                 break
             case ~/.*windows.*/:
@@ -78,8 +81,8 @@ class NativeLibsExtension {
         }
         currentArch = System.properties['os.arch'].toLowerCase()
         currentOSVersion = System.properties['os.version'].toLowerCase()
-        currentPlatform = "${currentOS}-${currentArch}"
-        supportedPlatforms[currentPlatform] = true
+        currentPlatform = "${currentOS}-${currentArch}".toString()
+        supportedPlatforms.add(currentPlatform)
     }
 
     /**
@@ -142,4 +145,60 @@ class NativeLibsExtension {
             throw new org.gradle.api.InvalidUserDataException("dependencyNotation must be a String or a Map (not a ${dependencyNotation.getClass()})")
         }
     }
+
+    /**
+     * Return a list of all the native dependencies for the given configuration and
+     * target platform
+     * @param config
+     * @param target
+     */
+    def getNativeDeps(configs, targets, Closure action=null) {
+        def artList = []
+        def seen = [:]
+        configs.each { config ->
+            config.resolvedConfiguration.getResolvedArtifacts().each { art ->
+                if (art.classifier && targets.contains(art.classifier.toString())) {
+                    if (!seen[art.file] && project.nativelibs.nativeExtensions[art.type]) {
+                        artList.add(art)
+                        if (action != null)
+                            action.call(art)
+                        seen[art.file] = true
+                    }
+                }
+            }
+        }
+        return artList
+    }
+
+    /**
+     * Get the resolved (unpacked) files for the native artifacts.
+     * @param configs
+     * @param targets
+     */
+    def getNativeDepFiles(configs, targets = supportedPlatforms) {
+        def fileList = []
+        getNativeDeps(configs, targets) { art ->
+            switch (art.type) {
+                case 'zip':
+                case 'jar':
+                    fileList.add(project.zipTree(art.file).getFiles())
+                    break
+                case 'tar':
+                    fileList.add(project.tarTree(art.file).getFiles())
+                    break
+                default:
+                    // Assume it's a single native lib
+                    fileList.add(art.file)
+            }
+        }
+        return fileList
+    }
+
+    /**
+     * Return a list of all the native dependencies for the given configuration and
+     * target platform
+     * @param config
+     * @param target
+     */
+    def getNativeDeps(configs, Closure action=null) {  getNativeDeps(configs, supportedPlatforms, action) }
 }
